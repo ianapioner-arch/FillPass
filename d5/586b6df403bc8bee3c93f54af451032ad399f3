@@ -1,0 +1,19 @@
+README.md
+  s_09a3a04fd08a6d::t_9cab25ed6612a7 1-93
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "d5586b6df403bc8bee3c93f54af451032ad399f3",
+  "prompts": {},
+  "sessions": {
+    "s_09a3a04fd08a6d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "65dc596f-5ca4-433c-ba98-a2824af80c1d",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Iana Pioner <iana.pioner@mercadolivre.com>"
+    }
+  }
+}
