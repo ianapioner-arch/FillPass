@@ -10,15 +10,27 @@ Uso:
 import subprocess
 import sys
 import time
-import keyring
+import getpass
 from pynput import keyboard
 from pynput.keyboard import HotKey, Controller, Key
 
-SERVICE_NAME = "FillPass"
-CREDENTIAL_USER_KEY = "certificate_username"
-CREDENTIAL_PASS_KEY = "certificate_password"
-
 kb_controller = Controller()
+
+# Credenciais carregadas na inicialização — ficam só na memória durante a sessão
+_username: str = ""
+_password: str = ""
+
+
+def preload_credentials() -> None:
+    """Pede credenciais uma vez ao iniciar. Ficam na memória — sem Keychain durante o uso."""
+    global _username, _password
+    print("Digite as credenciais do certificado digital:")
+    _username = input("Usuário: ").strip()
+    _password = getpass.getpass("Senha: ")
+    if not _username or not _password:
+        print("[FillPass] Usuário ou senha em branco. Encerrando.")
+        sys.exit(1)
+    print("[FillPass] Pronto! Credenciais carregadas.\n")
 
 
 def get_frontmost_app() -> str:
@@ -75,40 +87,26 @@ def _type_string(text: str) -> None:
 
 
 def fill_credentials() -> None:
-    """Orquestra: salva foco → pede aprovação → restaura foco → preenche campos."""
-    # Salva o app em foco ANTES do popup de aprovação aparecer
-    active_app = get_frontmost_app()
-
-    if not request_approval():
-        print("[FillPass] Cancelado pelo usuário.")
+    """Preenche usuário e senha direto onde o cursor está — sem popup."""
+    if not _username or not _password:
+        print("[FillPass] Credenciais não disponíveis.")
         return
 
-    username, password = get_credentials()
-    if not username:
-        return
+    time.sleep(0.3)
 
-    try:
-        # Volta o foco para a janela do certificado
-        activate_app(active_app)
-        time.sleep(1.2)
+    # Preenche usuário no campo atual
+    _type_string(_username)
+    time.sleep(0.5)
 
-        # Preenche usuário
-        _type_string(username)
-        time.sleep(0.3)
+    # Avança para o campo de senha com Tab
+    kb_controller.press(Key.tab)
+    kb_controller.release(Key.tab)
+    time.sleep(0.8)
 
-        # Avança para o campo de senha
-        kb_controller.press(Key.tab)
-        kb_controller.release(Key.tab)
-        time.sleep(0.4)
+    # Preenche senha
+    _type_string(_password)
 
-        # Preenche senha
-        _type_string(password)
-
-        print("[FillPass] Credenciais preenchidas.")
-    finally:
-        # Limpa da memória local imediatamente após uso
-        username = None
-        password = None
+    print("[FillPass] Credenciais preenchidas.")
 
 
 def run() -> None:
@@ -126,6 +124,8 @@ def run() -> None:
     print()
     print("Pressione Ctrl+C para encerrar.")
     print()
+
+    preload_credentials()
 
     hotkey = HotKey(
         HotKey.parse("<ctrl>+<shift>+f"),
