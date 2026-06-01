@@ -86,12 +86,24 @@ def _type_string(text: str) -> None:
         time.sleep(0.03)
 
 
-def fill_credentials() -> None:
-    """Preenche usuário e senha direto onde o cursor está — sem popup."""
-    if not _username or not _password:
-        print("[FillPass] Credenciais não disponíveis.")
-        return
+def _has_dialog() -> bool:
+    """Verifica se ainda há uma janelinha de certificado aberta no Chrome."""
+    result = subprocess.run(
+        ["osascript", "-e",
+         'tell application "System Events" to tell process "Google Chrome"\n'
+         '  if exists (text field 2 of front window) then\n'
+         '    return "true"\n'
+         '  end if\n'
+         '  return "false"\n'
+         'end tell'],
+        capture_output=True,
+        text=True,
+    )
+    return "true" in result.stdout
 
+
+def _fill_one() -> None:
+    """Preenche usuário, senha e clica em Permitir em uma janelinha."""
     time.sleep(0.3)
 
     # Preenche usuário no campo atual
@@ -105,8 +117,34 @@ def fill_credentials() -> None:
 
     # Preenche senha
     _type_string(_password)
+    time.sleep(0.3)
 
-    print("[FillPass] Credenciais preenchidas.")
+    # Clica em Permitir (Enter confirma o botão padrão)
+    kb_controller.press(Key.enter)
+    kb_controller.release(Key.enter)
+
+
+def fill_credentials() -> None:
+    """Preenche todas as janelinhas de certificado em loop até não restar nenhuma."""
+    if not _username or not _password:
+        print("[FillPass] Credenciais não disponíveis.")
+        return
+
+    count = 0
+    max_iterations = 20  # segurança para não rodar infinitamente
+
+    while count < max_iterations:
+        _fill_one()
+        count += 1
+        print(f"[FillPass] Janelinha {count} preenchida.")
+
+        # Aguarda a próxima janelinha aparecer
+        time.sleep(1.5)
+
+        if not _has_dialog():
+            break
+
+    print(f"[FillPass] Concluído — {count} janelinha(s) assinada(s).")
 
 
 def run() -> None:
@@ -117,10 +155,10 @@ def run() -> None:
     print("Atalho: Ctrl + Shift + F")
     print()
     print("Como usar:")
-    print("  1. Abra o contrato e clique em assinar")
-    print("  2. Quando a janelinha do certificado aparecer")
+    print("  1. Selecione os contratos e clique em assinar")
+    print("  2. Quando a primeira janelinha aparecer, clique no campo de usuário")
     print("  3. Pressione Ctrl+Shift+F")
-    print("  4. Confirme no popup")
+    print("  4. O robô preenche e clica em Permitir automaticamente em todas!")
     print()
     print("Pressione Ctrl+C para encerrar.")
     print()
