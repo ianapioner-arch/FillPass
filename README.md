@@ -64,11 +64,10 @@ Senha: (nada aparece enquanto digita — é normal)
 
 ### 3. Assine seus contratos
 
-1. Abra o contrato na plataforma de assinatura
-2. Clique em assinar com certificado digital
-3. Quando a janelinha de credenciais aparecer, **clique no campo de usuário**
-4. Pressione **Ctrl + Shift + F**
-5. ✅ Usuário e senha preenchidos automaticamente!
+1. Selecione os contratos e clique em assinar
+2. Quando a primeira janelinha aparecer, **clique no campo de usuário**
+3. Pressione **Ctrl + Shift + F**
+4. ✅ O robô preenche usuário, senha e clica em **Permitir** automaticamente em todas as janelinhas!
 
 ---
 
