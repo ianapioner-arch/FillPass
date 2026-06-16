@@ -159,63 +159,82 @@ def _fill_one() -> None:
 
 
 def _focus_next_dialog() -> bool:
-    """Aguarda a janelinha de credenciais aparecer (Chrome ou sistema macOS) e foca no campo."""
-    # Primeiro tenta no Chrome (sheets e janelas separadas)
-    chrome_script = (
-        'tell application "System Events" to tell process "Google Chrome"\n'
-        '  try\n'
-        '    set s to sheets of front window\n'
-        '    if (count s) > 0 then\n'
-        '      click text field 1 of item 1 of s\n'
-        '      return "true"\n'
-        '    end if\n'
-        '  end try\n'
-        '  repeat with w in windows\n'
-        '    try\n'
-        '      if exists (text field 1 of w) then\n'
-        '        click text field 1 of w\n'
-        '        return "true"\n'
-        '      end if\n'
-        '    end try\n'
-        '  end repeat\n'
-        '  return "false"\n'
-        'end tell'
-    )
-    # Depois tenta em qualquer processo do sistema (SecurityAgent, etc.)
-    system_script = (
+    """Aguarda a janelinha de credenciais aparecer apenas em processos confiáveis (não no Chrome)."""
+    # Procura apenas em processos que mostram diálogos de certificado: SecurityAgent e java
+    script = (
         'tell application "System Events"\n'
-        '  repeat with p in processes\n'
+        '  set trusted to {"SecurityAgent", "java", "Java"}\n'
+        '  repeat with pname in trusted\n'
         '    try\n'
-        '      repeat with w in windows of p\n'
-        '        try\n'
-        '          if exists (text field 1 of w) then\n'
-        '            set frontmost of p to true\n'
-        '            click text field 1 of w\n'
-        '            return "true"\n'
-        '          end if\n'
-        '        end try\n'
-        '      end repeat\n'
+        '      tell process pname\n'
+        '        repeat with w in windows\n'
+        '          try\n'
+        '            if exists (text field 1 of w) then\n'
+        '              set frontmost to true\n'
+        '              click text field 1 of w\n'
+        '              return "true"\n'
+        '            end if\n'
+        '          end try\n'
+        '        end repeat\n'
+        '      end tell\n'
         '    end try\n'
         '  end repeat\n'
         '  return "false"\n'
         'end tell'
     )
     for _ in range(10):
-        for script in [chrome_script, system_script]:
-            result = subprocess.run(
-                ["osascript", "-e", script],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            if "true" in result.stdout:
-                return True
+        result = subprocess.run(
+            ["osascript", "-e", script],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if "true" in result.stdout:
+            return True
         time.sleep(1)
     return False
 
 
+def _handle_declaration_modal() -> bool:
+    """Marca o checkbox de declaração e clica em OK (FepWeb)."""
+    js = (
+        "(function(){"
+        "var cbs=document.querySelectorAll('input[type=checkbox]');"
+        "var checked=false;"
+        "cbs.forEach(function(c){if(c.offsetParent!==null&&!c.checked){c.click();checked=true;}});"
+        "return checked?'checked':'already';"
+        "})();"
+    )
+    _run_js(js)
+    time.sleep(0.5)
+    return _click_buttons_by_text("ok") > 0
+
+
+def _check_dialog_now() -> bool:
+    """Verifica se já há uma janelinha de credenciais aberta em processos confiáveis."""
+    script = (
+        'tell application "System Events"\n'
+        '  set trusted to {"SecurityAgent", "java", "Java"}\n'
+        '  repeat with pname in trusted\n'
+        '    try\n'
+        '      tell process pname\n'
+        '        repeat with w in windows\n'
+        '          try\n'
+        '            if exists (text field 1 of w) then return "true"\n'
+        '          end try\n'
+        '        end repeat\n'
+        '      end tell\n'
+        '    end try\n'
+        '  end repeat\n'
+        '  return "false"\n'
+        'end tell'
+    )
+    result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=5)
+    return "true" in result.stdout
+
+
 def sign_all_contracts() -> None:
-    """Fluxo completo: Assinar → Continuar → seleciona certificado → preenche credenciais."""
+    """Fluxo completo: Assinar → (Continuar → Certificado se DocuSign) → preenche credenciais."""
     if not _username or not _password:
         print("[FillPass] Credenciais não disponíveis.")
         return
@@ -232,31 +251,48 @@ def sign_all_contracts() -> None:
         print("[FillPass] Nenhum botão 'Assinar'/'Sign' encontrado.")
     time.sleep(2.0)
 
-    # 2. Aguarda e clica em "Continuar" / "Continue"
-    print("[FillPass] Procurando 'Continuar' / 'Continue'...")
-    if _wait_for_button("continuar", "continue", wait_seconds=10):
-        print("[FillPass] 'Continuar' clicado.")
+    # Trata declaração de confirmação se aparecer (FepWeb)
+    print("[FillPass] Verificando declaração...")
+    if _handle_declaration_modal():
+        print("[FillPass] Declaração confirmada, OK clicado.")
         time.sleep(2.0)
-    else:
-        print("[FillPass] 'Continuar' não encontrado — pulando etapa.")
 
-    # 3. Seleciona o certificado pelo nome
-    print("[FillPass] Selecionando certificado...")
-    if _select_certificate():
-        print("[FillPass] Certificado selecionado.")
-    else:
-        print("[FillPass] Certificado não encontrado — selecione manualmente.")
-    time.sleep(1.0)
-
-    # 3b. Clica em "Avançar" duas vezes (seleção + confirmação do certificado)
-    for step in range(2):
-        print(f"[FillPass] Clicando em 'Avançar' (etapa {step+1})...")
-        if _wait_for_button("avan", "next", wait_seconds=8):
-            print("[FillPass] 'Avançar' clicado.")
-        else:
-            print("[FillPass] 'Avançar' não encontrado — pulando.")
+    # Aguarda até 6s para ver se a janelinha já apareceu (FepWeb — aparece direto)
+    dialog_appeared = False
+    for _ in range(6):
+        if _check_dialog_now():
+            dialog_appeared = True
             break
-        time.sleep(2.0)
+        time.sleep(1)
+
+    if dialog_appeared:
+        print("[FillPass] Janelinha detectada — pulando etapas de certificado.")
+    if not dialog_appeared:
+        # 2. Aguarda e clica em "Continuar" / "Continue" (DocuSign)
+        print("[FillPass] Procurando 'Continuar' / 'Continue'...")
+        if _wait_for_button("continuar", "continue", wait_seconds=8):
+            print("[FillPass] 'Continuar' clicado.")
+            time.sleep(2.0)
+        else:
+            print("[FillPass] 'Continuar' não encontrado — pulando etapa.")
+
+        # 3. Seleciona o certificado pelo nome (DocuSign)
+        print("[FillPass] Selecionando certificado...")
+        if _select_certificate():
+            print("[FillPass] Certificado selecionado.")
+        else:
+            print("[FillPass] Certificado não encontrado — selecione manualmente.")
+        time.sleep(1.0)
+
+        # 3b. Clica em "Avançar" duas vezes (seleção + confirmação do certificado)
+        for step in range(2):
+            print(f"[FillPass] Clicando em 'Avançar' (etapa {step+1})...")
+            if _wait_for_button("avan", "next", wait_seconds=8):
+                print("[FillPass] 'Avançar' clicado.")
+            else:
+                print("[FillPass] 'Avançar' não encontrado — pulando.")
+                break
+            time.sleep(2.0)
 
     # 4. Preenche usuário/senha em todas as janelinhas que aparecerem
     count = 0
