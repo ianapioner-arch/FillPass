@@ -196,18 +196,38 @@ def _focus_next_dialog() -> bool:
 
 
 def _handle_declaration_modal() -> bool:
-    """Marca o checkbox de declaração e clica em OK (FepWeb)."""
+    """Marca o checkbox de declaração e clica em OK — apenas se o modal do FepWeb estiver visível."""
+    # Só age se houver um checkbox E um botão OK visíveis ao mesmo tempo (modal FepWeb)
     js = (
         "(function(){"
         "var cbs=document.querySelectorAll('input[type=checkbox]');"
-        "var checked=false;"
-        "cbs.forEach(function(c){if(c.offsetParent!==null&&!c.checked){c.click();checked=true;}});"
-        "return checked?'checked':'already';"
+        "var visibleCb=Array.from(cbs).filter(function(c){return c.offsetParent!==null;});"
+        "if(visibleCb.length===0) return 'no_modal';"
+        "var btns=document.querySelectorAll('button,a,[role=button]');"
+        "var hasOk=Array.from(btns).some(function(b){"
+        "return (b.textContent||'').trim().toLowerCase()==='ok'&&b.offsetParent!==null;"
+        "});"
+        "if(!hasOk) return 'no_modal';"
+        "visibleCb.forEach(function(c){if(!c.checked)c.click();});"
+        "return 'ok';"
         "})();"
     )
-    _run_js(js)
+    result = _run_js(js)
+    if result != "ok":
+        return False
     time.sleep(0.5)
-    return _click_buttons_by_text("ok") > 0
+    # Clica apenas em botão cujo texto seja exatamente "OK"
+    js_ok = (
+        "(function(){"
+        "var btns=document.querySelectorAll('button,a,[role=button]');"
+        "for(var i=0;i<btns.length;i++){"
+        "var t=(btns[i].textContent||'').trim();"
+        "if(t==='OK'&&btns[i].offsetParent!==null){btns[i].click();return 'clicked';}"
+        "}"
+        "return 'nf';"
+        "})();"
+    )
+    return _run_js(js_ok) == "clicked"
 
 
 def _check_dialog_now() -> bool:
@@ -308,6 +328,42 @@ def sign_all_contracts() -> None:
         time.sleep(0.5)
 
     print(f"[FillPass] Concluído — {count} janelinha(s) assinada(s).")
+
+    # Após assinar: clica "Continuar" (se aparecer) e depois "Concluir"
+    if count > 0:
+        print("[FillPass] Aguardando processamento...")
+        time.sleep(3.0)
+        if _wait_for_button("continuar", "continue", wait_seconds=10):
+            print("[FillPass] 'Continuar' pós-assinatura clicado.")
+            time.sleep(2.0)
+
+        # Clica "Concluir"/"Finish" — clica em todos os elementos com esse texto exato
+        print("[FillPass] Procurando 'Concluir'...")
+        js_concluir = (
+            "(function(){"
+            "var n=0;"
+            "document.querySelectorAll('*').forEach(function(e){"
+            "if(e.offsetParent!==null){"
+            "var t=e.textContent.trim().toLowerCase();"
+            "if(t==='concluir'||t==='finish'){"
+            "['mousedown','mouseup','click'].forEach(function(ev){"
+            "e.dispatchEvent(new MouseEvent(ev,{bubbles:true,cancelable:true,view:window}));"
+            "});"
+            "n++;"
+            "}"
+            "}"
+            "});"
+            "return n>0?'ok':'nf';"
+            "})();"
+        )
+        found = False
+        for _ in range(15):
+            if _run_js(js_concluir) == "ok":
+                found = True
+                break
+            time.sleep(1)
+        if found:
+            print("[FillPass] 'Concluir' clicado. Assinatura finalizada!")
 
 
 def run() -> None:
