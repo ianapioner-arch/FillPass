@@ -1,0 +1,25 @@
+FillPass.py
+  s_09a3a04fd08a6d::t_eb54d978087a1b 332,334,336-338
+  s_09a3a04fd08a6d::t_3afde21de00149 339,341-343,346,354-355,357-365
+  s_09a3a04fd08a6d::t_1096c3a8acccee 199-200,204-212,215-217,219-230
+  s_09a3a04fd08a6d::t_d6c39b12461c1e 333,366-367
+  s_09a3a04fd08a6d::t_e16b318c22cfdd 335
+  s_09a3a04fd08a6d::t_07a4ac88d777d3 340,344,347-353,356
+  s_09a3a04fd08a6d::t_83857c4f8361a0 345
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "8a78cbcfab7190e10716829272351538318cd64c",
+  "prompts": {},
+  "sessions": {
+    "s_09a3a04fd08a6d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "65dc596f-5ca4-433c-ba98-a2824af80c1d",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Iana Pioner <iana.pioner@mercadolivre.com>"
+    }
+  }
+}
