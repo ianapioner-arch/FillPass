@@ -98,18 +98,18 @@ def _select_certificate() -> bool:
             )
             if _run_js(js) == "ok":
                 return True
-
-        # Fallback: segundo radio button (índice 1) — pula o certificado de máquina
-        js = (
-            "(function(){"
-            "var radios=document.querySelectorAll('input[type=radio]');"
-            "if(radios.length>1){radios[1].click();return 'ok';}"
-            "if(radios.length>0){radios[0].click();return 'ok';}"
-            "return 'nf';"
-            "})();"
-        )
-        if _run_js(js) == "ok":
-            return True
+        else:
+            # Sem nome informado: fallback para segundo radio (pula certificado de máquina)
+            js = (
+                "(function(){"
+                "var radios=document.querySelectorAll('input[type=radio]');"
+                "if(radios.length>1){radios[1].click();return 'ok';}"
+                "if(radios.length>0){radios[0].click();return 'ok';}"
+                "return 'nf';"
+                "})();"
+            )
+            if _run_js(js) == "ok":
+                return True
 
         time.sleep(1)
     return False
